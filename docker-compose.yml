@@ -1,0 +1,22 @@
+services:
+  sam3:
+    build: .
+    image: sam3-inference
+    volumes:
+      - ./results:/app/sam3/results
+      - ./image:/app/sam3/image
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    tty: true
+    ipc: host
+
+volumes:
+  hf_cache:
