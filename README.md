@@ -1,31 +1,85 @@
 # SAM3 Batch Inference Helper
 
-このフォルダには、Meta の SAM3 を使って画像フォルダ全体に対してテキストプロンプトによるセグメンテーションを行うための簡易スクリプトと Docker 環境が入っています。`docker-compose.yml` を使うことで GPU 対応のコンテナを立ち上げ、`run_inference.py` を実行できます。
+Meta の SAM3 を使って画像フォルダ全体に対してテキストプロンプトによるセグメンテーションを行うための簡易スクリプトと Docker 環境です。
 
-SAM3 (Segment Anything Model v3) は、画像とテキストを同時に理解して任意の対象を切り出す大規模ビジョンモデルです。画像をセットしてテキストで「どのような対象を切り出したいか」を伝えると、対応するマスクを返します。本リポジトリでは公式チェックポイントをコンテナ内で取得し、バッチ処理を自動化しています。
+## クイックスタート
 
-## セットアップ
+### 1. 事前準備
 
-1. Hugging Face で `facebook/sam3` のアクセス権を取得し、ホスト側で `huggingface-cli login` を実行してください。
-2. `docker-test` ディレクトリに移動し、必要なら `.env` に `HF_TOKEN=<your_token>` を設定します。
-3. スクリプトが結果を保存できるよう、ホスト側に `results` ディレクトリを作成します。
+まず、必要なディレクトリを作成し、Hugging Face Token を設定します：
 
 ```bash
-cd docker-test
+# 必要なディレクトリを作成
 mkdir -p results image
+
+# 環境設定ファイルを作成
+cp .env.example .env
 ```
 
-`image` フォルダには推論したい画像ファイル（jpg/png など）を配置します。`docker-compose.yml` では `./image:/app/sam3/image` と `./results:/app/sam3/results` をマウントしているため、ホスト側で準備したフォルダがコンテナから利用されます。
+次に、`.env` ファイルを編集して Hugging Face Token を設定してください：
 
-## コンテナの起動
+1. https://transmediatechlab.esa.io/posts/291 にアクセスして研究室用の Hugging Face Token を取得
+2. `.env` ファイルを開いて `HF_TOKEN=<取得したトークン>` を設定
+
+最後に、推論したい画像を配置します：
 
 ```bash
-docker compose up -d --build sam3
+# 推論したい画像を image フォルダに配置
+cp /path/to/your/images/*.jpg image/
+# または
+cp /path/to/your/images/*.png image/
 ```
 
-初回実行後は、必要に応じて `docker compose exec sam3 bash` でコンテナ内に入るか、後述のコマンドで直接スクリプトを実行します。
+### 2. コンテナ起動
 
-## `run_inference.py` の使い方
+```bash
+docker compose up -d --build
+```
+
+### 3. 推論実行
+
+```bash
+# 基本的な実行例
+docker compose exec sam3 \
+  uv run run_inference.py
+
+# 対話型を使用しないで、プロンプトを指定する場合
+docker compose exec sam3 \
+  uv run run_inference.py \
+  --prompt "soccer players"
+
+# マスクを個別保存する場合
+docker compose exec sam3 \
+  uv run run_inference.py \
+  --prompt "soccer players" \
+  --save-individual-masks
+
+# サンプル画像でも試す場合
+docker compose exec sam3 \
+  uv run run_inference.py \
+  --prompt "soccer players" \
+  --save-individual-masks \
+  --run-sample
+```
+
+結果は `results/` ディレクトリに保存されます。
+
+---
+
+## 詳細説明
+
+### SAM3 について
+
+SAM3 (Segment Anything Model v3) は、画像とテキストを同時に理解して任意の対象をセグメントする大規模ビジョンモデルです。画像をセットしてテキストで「どのような対象をセグメントしたいか」を伝えると、対応するマスクを返します。本リポジトリでは公式チェックポイントをコンテナ内で取得し、バッチ処理を自動化しています。
+
+### セットアップの詳細
+
+1. https://transmediatechlab.esa.io/posts/291 にアクセスし、研究室用の Hugging Face Token を取得します。
+2. `.env` に `HF_TOKEN=<your_token>` を設定します。
+3. `image` フォルダには推論したい画像ファイル（jpg/png など）を配置します。
+4. `docker-compose.yml` では `./image:/app/sam3/image` と `./results:/app/sam3/results` をマウントしているため、ホスト側で準備したフォルダがコンテナから利用されます。
+
+### `run_inference.py` のオプション
 
 スクリプトは以下のようなオプションを持ちます。
 
@@ -39,7 +93,7 @@ docker compose up -d --build sam3
 | `--run-sample` | 既定のサンプル画像（トラック画像）でも推論を実行 | 無効 |
 | `--sample-url` | `--run-sample` で利用する画像 URL | SAM3 デモ画像 |
 
-### 実行例
+### 詳細な実行例
 
 ```bash
 docker compose exec sam3 \
@@ -73,5 +127,3 @@ docker compose exec sam3 \
 - **マスクが 1 枚しか表示されない**: SAM3 が返す `masks` の数が 1 の可能性があります。`--save-individual-masks` で出力された二値マスクを確認し、別のプロンプト（短い英語など）も試してください。
 - **チェックポイントが取得できない**: Hugging Face のログインやリポジトリアクセス権の確認が必要です。必要に応じて `huggingface-cli login` をやり直してください。
 
----
-不具合や改善点があれば、`run_inference.py` の該当箇所を調整し、README も併せて更新してください。
